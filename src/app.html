@@ -1,0 +1,490 @@
+<title>Lamp Thread Maker</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700;800&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: workbench — a settings column beside a large 3D stage, dimension callouts like a drawing's title block */
+:root {
+  --bg: #eef1f4;          /* cool drafting-table grey */
+  --panel: #ffffff;
+  --ink: #18212b;
+  --muted: #5d6874;
+  --line: #d5dbe2;
+  --accent: #d9821c;      /* lamp-glow amber */
+  --accent-ink: #ffffff;
+  --stage: #dfe4ea;
+  --ok: #2f7d4f; --warn: #a8641a; --bad: #b3362f;
+  --font-display: "Archivo", "Helvetica Neue", Arial, sans-serif;
+  --font-body: "IBM Plex Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #12161b; --panel: #1a2027; --ink: #e7ecf1; --muted: #9aa5b1; --line: #2c343e;
+  --accent: #f0a23e; --accent-ink: #1a1206; --stage: #0d1115;
+  --ok: #5cc285; --warn: #e6a35a; --bad: #ef7a72; color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --bg: #12161b; --panel: #1a2027; --ink: #e7ecf1; --muted: #9aa5b1; --line: #2c343e;
+  --accent: #f0a23e; --accent-ink: #1a1206; --stage: #0d1115;
+  --ok: #5cc285; --warn: #e6a35a; --bad: #ef7a72; color-scheme: dark; }
+
+html, body { height: 100%; }
+body { background: var(--bg); color: var(--ink); font-family: var(--font-body); font-size: 14px; line-height: 1.45; }
+.wrap { max-width: 1320px; margin: 0 auto; padding-block: 20px 28px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  display: grid; gap: 16px; }
+header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 16px; }
+h1 { font-family: var(--font-display); font-weight: 800; font-size: 26px; letter-spacing: -0.01em; margin: 0; text-wrap: balance; }
+header p { margin: 0; color: var(--muted); max-width: 70ch; }
+.grid { display: grid; grid-template-columns: minmax(300px, 360px) 1fr; gap: 16px; align-items: start; }
+@media (max-width: 860px) { .grid { grid-template-columns: 1fr; } }
+
+.panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; min-width: 0; }
+.controls { display: grid; gap: 0; }
+.sec { padding: 14px 16px; border-top: 1px solid var(--line); display: grid; gap: 10px; }
+.sec:first-child { border-top: 0; }
+.sec h2 { font-family: var(--font-display); font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); margin: 0; }
+
+.drop { border: 1.5px dashed var(--line); border-radius: 8px; padding: 14px; display: grid; gap: 4px; text-align: center; cursor: pointer; transition: border-color .15s, background .15s; }
+.drop:hover, .drop.over { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 7%, transparent); }
+.drop strong { font-weight: 600; }
+.drop span { color: var(--muted); font-size: 12.5px; }
+.drop.small { padding: 8px 10px; text-align: left; }
+.file-name { font-family: var(--font-mono); font-size: 12.5px; word-break: break-all; }
+
+.fields { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 10px; }
+.field { display: grid; gap: 3px; min-width: 0; }
+.field label { font-size: 12px; color: var(--muted); }
+.field input, .field select { width: 100%; box-sizing: border-box; font: 500 13px var(--font-mono); color: var(--ink); background: var(--bg);
+  border: 1px solid var(--line); border-radius: 6px; padding: 6px 8px; font-variant-numeric: tabular-nums; }
+.field input:focus-visible, .field select:focus-visible, button:focus-visible, .drop:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+details summary { cursor: pointer; font-size: 12.5px; color: var(--muted); }
+details[open] summary { margin-bottom: 8px; }
+
+.btn { font: 600 14px var(--font-body); border-radius: 8px; padding: 10px 14px; border: 1px solid var(--line); background: var(--panel); color: var(--ink); cursor: pointer; }
+.btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+.btn:disabled { opacity: .5; cursor: not-allowed; }
+.actions { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+
+.stage-wrap { display: grid; gap: 12px; min-width: 0; }
+.stage { position: relative; height: min(68vh, 640px); min-height: 340px; border-radius: 10px; overflow: hidden; background: var(--stage); border: 1px solid var(--line); }
+.stage canvas { display: block; width: 100%; height: 100%; touch-action: none; }
+.toolbar { position: absolute; top: 10px; left: 10px; right: 10px; display: flex; flex-wrap: wrap; gap: 6px; pointer-events: none; }
+.seg { display: inline-flex; background: var(--panel); border: 1px solid var(--line); border-radius: 8px; overflow: hidden; pointer-events: auto; }
+.seg button { font: 500 12.5px var(--font-body); border: 0; background: transparent; color: var(--muted); padding: 6px 10px; cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--ink); color: var(--panel); }
+.busy { position: absolute; inset: 0; display: grid; place-items: center; background: color-mix(in srgb, var(--stage) 70%, transparent); font-weight: 500; }
+.busy[hidden] { display: none; }
+.busy div { display: flex; gap: 10px; align-items: center; background: var(--panel); border: 1px solid var(--line); padding: 10px 14px; border-radius: 8px; }
+.spin { width: 16px; height: 16px; border-radius: 50%; border: 2px solid var(--line); border-top-color: var(--accent); animation: sp 0.8s linear infinite; }
+@keyframes sp { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) { .spin { animation-duration: 3s; } }
+.sample-tag { position: absolute; bottom: 10px; left: 10px; font-size: 12px; background: var(--panel); border: 1px solid var(--line); padding: 3px 8px; border-radius: 6px; color: var(--muted); }
+
+.specs { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 0; }
+.spec { padding: 10px 14px; border-left: 1px solid var(--line); display: grid; gap: 2px; min-width: 0; }
+.spec:first-child { border-left: 0; }
+.spec .k { font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+.spec .v { font: 500 15px var(--font-mono); font-variant-numeric: tabular-nums; }
+@media (max-width: 520px) { .spec { border-left: 0; border-top: 1px solid var(--line); } .spec:first-child { border-top: 0; } }
+
+.notes { display: grid; gap: 6px; padding: 12px 14px; }
+.note { display: flex; gap: 8px; align-items: baseline; font-size: 13.5px; }
+.pill { font: 600 11px var(--font-body); text-transform: uppercase; letter-spacing: 0.05em; padding: 2px 7px; border-radius: 99px; white-space: nowrap; }
+.pill.ok { background: color-mix(in srgb, var(--ok) 15%, transparent); color: var(--ok); }
+.pill.warn { background: color-mix(in srgb, var(--warn) 18%, transparent); color: var(--warn); }
+.pill.bad { background: color-mix(in srgb, var(--bad) 15%, transparent); color: var(--bad); }
+.hint { color: var(--muted); font-size: 12.5px; margin: 0; }
+</style>
+
+<div class="wrap">
+  <header>
+    <h1>Lamp Thread Maker</h1>
+    <p>Drop a lampshade STL. It finds the bottom opening, adds a screw-on threaded ring, and makes a matching base that holds your LED puck with a cable slot.</p>
+  </header>
+
+  <div class="grid">
+    <aside class="panel controls" aria-label="Settings">
+      <div class="sec">
+        <h2>1 · Cover model</h2>
+        <div class="drop" id="drop" tabindex="0" role="button" aria-label="Choose a cover STL file">
+          <strong>Drop a cover STL here</strong>
+          <span>or click to choose · binary or ASCII</span>
+          <span class="file-name" id="fileName">Showing a sample globe shade</span>
+        </div>
+        <input type="file" id="fileIn" accept=".stl" hidden>
+        <div class="fields">
+          <div class="field"><label for="unit">File units</label>
+            <select id="unit"><option value="1">mm</option><option value="10">cm</option><option value="1000">m</option><option value="25.4">inch</option></select></div>
+          <div class="field"><label for="up">Opening faces</label>
+            <select id="up"><option value="+Z">down (Z up)</option><option value="-Z">up (flip)</option><option value="+Y">down (Y up)</option><option value="-Y">up (−Y)</option><option value="+X">down (X up)</option><option value="-X">up (−X)</option></select></div>
+        </div>
+        <p class="hint" id="coverInfo">Units and orientation are detected automatically. Change them if the preview looks wrong.</p>
+      </div>
+
+      <div class="sec">
+        <h2>2 · LED kit</h2>
+        <div class="drop small" id="ledDrop" tabindex="0" role="button" aria-label="Measure from an LED model STL">
+          <strong>Measure from LED model (optional)</strong>
+          <span id="ledInfo">Drop the LED puck STL to fill in diameter and height</span>
+        </div>
+        <input type="file" id="ledIn" accept=".stl" hidden>
+        <div class="fields">
+          <div class="field"><label for="ledD">Puck diameter (mm)</label><input id="ledD" type="number" step="0.1" min="10" value="59.4"></div>
+          <div class="field"><label for="ledH">Puck height (mm)</label><input id="ledH" type="number" step="0.1" min="2" value="7.9"></div>
+          <div class="field"><label for="cableD">Cable Ø (mm)</label><input id="cableD" type="number" step="0.1" min="1" value="2.8"></div>
+          <div class="field"><label for="cableZ">Cable height (mm)</label><input id="cableZ" type="number" step="0.1" min="0" value="1.6"></div>
+        </div>
+        <p class="hint">Cable height is from the bottom of the puck to the centre of the cable.</p>
+      </div>
+
+      <div class="sec">
+        <h2>3 · Fit</h2>
+        <div class="fields">
+          <div class="field"><label for="pocketClr">Pocket gap / side</label><input id="pocketClr" type="number" step="0.05" min="0" value="0.30"></div>
+          <div class="field"><label for="thClr">Thread gap</label><input id="thClr" type="number" step="0.05" min="0" value="0.30"></div>
+          <div class="field"><label for="pitch">Thread pitch</label><input id="pitch" type="number" step="0.5" min="1" value="2.0"></div>
+          <div class="field"><label for="threadH">Thread length</label><input id="threadH" type="number" step="0.5" min="4" value="8.5"></div>
+        </div>
+        <details>
+          <summary>More settings</summary>
+          <div class="fields">
+            <div class="field"><label for="depth">Thread depth</label><input id="depth" type="number" step="0.1" min="0.4" value="0.9"></div>
+            <div class="field"><label for="wall">Base wall</label><input id="wall" type="number" step="0.1" min="0.8" value="1.5"></div>
+            <div class="field"><label for="collarWall">Ring wall</label><input id="collarWall" type="number" step="0.1" min="1" value="2.6"></div>
+            <div class="field"><label for="floor">Base floor</label><input id="floor" type="number" step="0.1" min="0.8" value="1.5"></div>
+            <div class="field"><label for="bandH">Visible band</label><input id="bandH" type="number" step="0.5" min="2" value="5.5"></div>
+            <div class="field"><label for="slotAngle">Cable slot angle°</label><input id="slotAngle" type="number" step="15" value="180"></div>
+            <div class="field"><label for="pushHole">Push-out hole</label><select id="pushHole"><option value="1">yes</option><option value="0">no</option></select></div>
+          </div>
+        </details>
+      </div>
+
+      <div class="sec">
+        <div class="actions">
+          <button class="btn" id="genBtn">Regenerate</button>
+          <button class="btn primary" id="dlBtn" disabled>Download .zip</button>
+        </div>
+        <p class="hint" id="dlHint">Downloads a zip with the threaded cover, the base and a settings note.</p>
+      </div>
+    </aside>
+
+    <section class="stage-wrap" aria-label="Preview">
+      <div class="stage" id="stage">
+        <div class="toolbar">
+          <div class="seg" role="group" aria-label="View">
+            <button id="vAsm" aria-pressed="true">Assembled</button>
+            <button id="vExp" aria-pressed="false">Exploded</button>
+            <button id="vCut" aria-pressed="false">Cutaway</button>
+          </div>
+          <div class="seg" role="group" aria-label="Lighting">
+            <button id="vGlow" aria-pressed="false">Light on</button>
+          </div>
+        </div>
+        <div class="sample-tag" id="sampleTag">Sample shade. Drop your own STL to replace it.</div>
+        <div class="busy" id="busy"><div><span class="spin" aria-hidden="true"></span><span id="busyMsg">Loading geometry engine…</span></div></div>
+      </div>
+
+      <div class="panel specs" id="specs" aria-label="Dimensions"></div>
+      <div class="panel notes" id="notes" aria-live="polite"></div>
+    </section>
+  </div>
+</div>
+
+<script id="wasm-b64" type="application/octet-stream">__WASM_B64__</script>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"
+} }
+</script>
+<script type="module">
+import * as THREE from "three";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
+
+/*__LAMPCORE__*/
+
+const $ = (id) => document.getElementById(id);
+const tick = () => new Promise((r) => setTimeout(r, 30));
+const fmt = (v, d = 1) => Number(v).toFixed(d);
+
+// ---------- engine ----------
+let M = null;
+async function loadEngine() {
+  const b64 = $("wasm-b64").textContent.trim();
+  const bin = Uint8Array.from(atob(b64), (c) => c.charCodeAt(0));
+  const mod = await import("https://cdn.jsdelivr.net/npm/manifold-3d@3.2.1/manifold.js");
+  const m = await mod.default({ wasmBinary: bin.buffer });
+  m.setup();
+  return m;
+}
+
+// ---------- viewer ----------
+const stage = $("stage");
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.localClippingEnabled = true;
+stage.prepend(renderer.domElement);
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(35, 1, 1, 5000);
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+scene.add(new THREE.HemisphereLight(0xffffff, 0x8899aa, 1.6));
+const key = new THREE.DirectionalLight(0xffffff, 1.6); key.position.set(150, -200, 260); scene.add(key);
+const glowLight = new THREE.PointLight(0xffb45a, 0, 400, 1.2); scene.add(glowLight);
+const clip = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+const mats = {
+  cover: new THREE.MeshStandardMaterial({ color: 0xf3efe6, roughness: 0.55, transparent: true, opacity: 0.78, side: THREE.DoubleSide, flatShading: true, depthWrite: false }),
+  base: new THREE.MeshStandardMaterial({ color: 0x6f8fb0, roughness: 0.6, side: THREE.DoubleSide, flatShading: true }),
+  led: new THREE.MeshStandardMaterial({ color: 0xd2694f, roughness: 0.5, side: THREE.DoubleSide }),
+};
+const groups = { cover: new THREE.Group(), base: new THREE.Group(), led: new THREE.Group() };
+Object.values(groups).forEach((g) => scene.add(g));
+camera.up.set(0, 0, 1);
+
+function resize() {
+  const w = stage.clientWidth, h = stage.clientHeight;
+  renderer.setSize(w, h, false); camera.aspect = w / h; camera.updateProjectionMatrix();
+}
+new ResizeObserver(resize).observe(stage);
+(function loop() { controls.update(); renderer.render(scene, camera); requestAnimationFrame(loop); })();
+
+function manToGeom(man) {
+  const m = man.getMesh();
+  const g = new THREE.BufferGeometry();
+  const np = m.numProp;
+  const pos = np === 3 ? m.vertProperties : (() => { const p = new Float32Array(m.vertProperties.length / np * 3); for (let i = 0, j = 0; i < p.length; i += 3, j += np) { p[i] = m.vertProperties[j]; p[i + 1] = m.vertProperties[j + 1]; p[i + 2] = m.vertProperties[j + 2]; } return p; })();
+  g.setAttribute("position", new THREE.BufferAttribute(pos, 3));
+  g.setIndex(new THREE.BufferAttribute(m.triVerts, 1));
+  g.computeVertexNormals();
+  return g;
+}
+function setGroup(name, objs) {
+  const g = groups[name];
+  g.children.forEach((c) => c.geometry?.dispose());
+  g.clear(); objs.forEach((o) => g.add(o));
+}
+
+let view = "asm", glow = false, last = null;
+function applyView() {
+  if (!last) return;
+  const { D } = last;
+  const exp = view === "exp" ? 1 : 0;
+  groups.base.position.z = 0;
+  groups.led.position.z = exp * (D.wallTop + 18);
+  groups.cover.position.z = D.bandH + exp * (D.wallTop + 45);
+  const planes = view === "cut" ? [clip] : [];
+  Object.values(mats).forEach((m) => { m.clippingPlanes = planes; m.needsUpdate = true; });
+  mats.cover.opacity = view === "cut" ? 0.92 : 0.78;
+  mats.cover.emissive = new THREE.Color(glow ? 0xffb45a : 0x000000);
+  mats.cover.emissiveIntensity = glow ? 0.55 : 0;
+  glowLight.intensity = glow ? 4000 : 0;
+  glowLight.position.set(0, 0, D.ledTop + 8);
+  for (const [id, v] of [["vAsm", "asm"], ["vExp", "exp"], ["vCut", "cut"]]) $(id).setAttribute("aria-pressed", String(view === v));
+  $("vGlow").setAttribute("aria-pressed", String(glow));
+}
+$("vAsm").onclick = () => { view = "asm"; applyView(); };
+$("vExp").onclick = () => { view = "exp"; applyView(); };
+$("vCut").onclick = () => { view = "cut"; applyView(); };
+$("vGlow").onclick = () => { glow = !glow; applyView(); };
+
+function frame(height, radius) {
+  const h = height, R = Math.hypot(Math.max(radius, 30), h / 2), r = R;
+  const dir = new THREE.Vector3(0.55, -0.72, 0.42).normalize().multiplyScalar(R * 3.4);
+  controls.target.set(0, 0, h * 0.45);
+  camera.position.set(dir.x, dir.y, h * 0.45 + dir.z);
+  camera.near = 1; camera.far = r * 40; camera.updateProjectionMatrix();
+}
+
+// ---------- state ----------
+const S = { name: "sample-globe", raw: null, scale: 1, up: "+Z", cover: null, result: null, sample: true };
+
+function readParams() {
+  const n = (id) => parseFloat($(id).value);
+  return { ...DEFAULTS, ledD: n("ledD"), ledH: n("ledH"), cableD: n("cableD"), cableZ: n("cableZ"),
+    pocketClr: n("pocketClr"), thClr: n("thClr"), pitch: n("pitch"), threadH: n("threadH"),
+    depth: n("depth"), wall: n("wall"), collarWall: n("collarWall"), floor: n("floor"), bandH: n("bandH"),
+    slotAngle: n("slotAngle"), pushHole: $("pushHole").value === "1" };
+}
+function validParams(P) {
+  for (const [k, v] of Object.entries(P)) if (typeof v === "number" && !Number.isFinite(v)) return `“${k}” needs a number.`;
+  if (P.depth >= P.pitch * 0.9) return "Thread depth must be smaller than the pitch.";
+  return null;
+}
+
+function busy(msg) { $("busy").hidden = !msg; if (msg) $("busyMsg").textContent = msg; }
+function note(kind, text) {
+  const d = document.createElement("div"); d.className = "note";
+  const p = document.createElement("span"); p.className = "pill " + kind; p.textContent = { ok: "OK", warn: "Check", bad: "Error" }[kind];
+  const t = document.createElement("span"); t.textContent = text.charAt(0).toUpperCase() + text.slice(1);
+  d.append(p, t); return d;
+}
+function showNotes(list) { $("notes").replaceChildren(...list); }
+
+function sampleCover() {
+  // Ø110 globe shade, 1.2 mm wall, open at the bottom
+  const outer = M.Manifold.sphere(1, 128).scale([55, 55, 45]);
+  const inner = M.Manifold.sphere(1, 128).scale([53.8, 53.8, 43.8]);
+  let g = outer.subtract(inner).subtract(M.Manifold.cube([200, 200, 100], true).translate([0, 0, -38 - 50]));
+  const bb = g.boundingBox();
+  return g.translate([0, 0, -bb.min[2]]);
+}
+
+function rebuildCover() {
+  if (S.cover) { S.cover.delete(); S.cover = null; }
+  if (S.sample) { S.cover = sampleCover(); return; }
+  S.cover = toManifold(M, orient(S.raw, S.up, S.scale));
+}
+
+async function run() {
+  const P = readParams();
+  const err = validParams(P);
+  if (err) { showNotes([note("bad", err)]); return; }
+  $("genBtn").disabled = true; $("dlBtn").disabled = true;
+  busy("Cutting threads… large models take 10–30 s");
+  await tick();
+  try {
+    if (S.result) { S.result.base.delete(); S.result.cover.delete(); }
+    const t0 = performance.now();
+    const r = generate(M, S.cover, P);
+    S.result = r; last = r;
+    const { D } = r;
+    setGroup("cover", [new THREE.Mesh(manToGeom(r.cover), mats.cover)]);
+    setGroup("base", [new THREE.Mesh(manToGeom(r.base), mats.base)]);
+    const puck = new THREE.Mesh(new THREE.CylinderGeometry(P.ledD / 2, P.ledD / 2, P.ledH, 96), mats.led);
+    puck.rotation.x = Math.PI / 2; puck.position.z = P.floor + P.ledH / 2;
+    const cable = new THREE.Mesh(new THREE.CylinderGeometry(P.cableD / 2, P.cableD / 2, 60, 24), mats.led);
+    const a = (P.slotAngle * Math.PI) / 180;
+    cable.rotation.z = a + Math.PI / 2;
+    cable.position.set(Math.cos(a) * (P.ledD / 2 + 30), Math.sin(a) * (P.ledD / 2 + 30), P.floor + P.cableZ);
+    setGroup("led", [puck, cable]);
+    const bb = r.cover.boundingBox();
+    frame(bb.max[2] + D.bandH, Math.max(bb.max[0], bb.max[1]));
+    applyView();
+    renderSpecs(r, P);
+    const list = [];
+    if (!r.notes.some((n) => n.startsWith("Warning"))) list.push(note("ok", `Base and cover fit with no overlap; the LED sits ${fmt(D.wallTop - D.ledTop)} mm below the rim. Built in ${fmt((performance.now() - t0) / 1000)} s.`));
+    for (const n of r.notes) list.push(note(n.startsWith("Warning") ? "warn" : "ok", n.replace(/^Warning: /, "")));
+    showNotes(list);
+    $("dlBtn").disabled = false;
+  } catch (e) {
+    console.error(e);
+    showNotes([note("bad", e.message || String(e))]);
+  } finally { busy(null); $("genBtn").disabled = false; }
+}
+
+function renderSpecs(r, P) {
+  const { D, bottom } = r;
+  const bb = r.cover.boundingBox();
+  const items = [
+    ["Cover", `Ø${fmt(2 * Math.max(bb.max[0], bb.max[1]))} × ${fmt(bb.max[2])}`],
+    ["Opening found", bottom.open ? `Ø${fmt(2 * bottom.rIn)}` : "closed"],
+    ["Thread", `Ø${fmt(2 * D.crestR)} × ${fmt(P.pitch)} RH`],
+    ["Ring outer", `Ø${fmt(2 * D.collarROut)}`],
+    ["LED pocket", `Ø${fmt(2 * D.pocketR, 2)} × ${fmt(D.wallTop - P.floor)}`],
+    ["Base", `Ø${fmt(2 * D.crestR)} × ${fmt(D.wallTop)} · ${fmt(D.bandH)} shows`],
+  ];
+  $("specs").replaceChildren(...items.map(([k, v]) => {
+    const d = document.createElement("div"); d.className = "spec";
+    d.innerHTML = `<span class="k"></span><span class="v"></span>`;
+    d.children[0].textContent = k; d.children[1].textContent = v; return d;
+  }));
+}
+
+// ---------- file input ----------
+function wireDrop(el, input, onFile) {
+  el.onclick = () => input.click();
+  el.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); input.click(); } };
+  input.onchange = () => input.files[0] && onFile(input.files[0]);
+  el.ondragover = (e) => { e.preventDefault(); el.classList.add("over"); };
+  el.ondragleave = () => el.classList.remove("over");
+  el.ondrop = (e) => { e.preventDefault(); el.classList.remove("over"); const f = e.dataTransfer.files[0]; f && onFile(f); };
+}
+
+async function loadCoverFile(file) {
+  if (!M) return;
+  busy("Reading " + file.name + "…"); await tick();
+  try {
+    const raw = parseSTL(await file.arrayBuffer());
+    const u = guessUnitScale(raw);
+    S.raw = raw; S.scale = u.scale; S.sample = false; S.name = file.name.replace(/\.stl$/i, "");
+    $("unit").value = String(u.scale);
+    busy("Finding the opening…"); await tick();
+    const a = autoUp(M, raw, u.scale);
+    S.up = a.up; $("up").value = a.up;
+    $("fileName").textContent = file.name;
+    $("sampleTag").hidden = true;
+    $("coverInfo").textContent = `${(raw.length / 9).toLocaleString()} triangles · read as ${u.unit} · opening detected facing ${a.up === "+Z" ? "down" : "the " + a.up + " side"}. Change these if the preview looks wrong.`;
+    rebuildCover();
+  } catch (e) { busy(null); showNotes([note("bad", e.message || String(e))]); return; }
+  await run();
+}
+async function loadLedFile(file) {
+  try {
+    const raw = parseSTL(await file.arrayBuffer());
+    const u = guessUnitScale(raw);
+    const ext = bounds(raw).ext.map((e) => e * u.scale).sort((x, y) => x - y);
+    $("ledH").value = fmt(ext[0], 2); $("ledD").value = fmt(ext[1], 2);
+    $("ledInfo").textContent = `${file.name}: Ø${fmt(ext[1], 2)} × ${fmt(ext[0], 2)} mm (cable not measured)`;
+    if (M && S.cover) await run();
+  } catch (e) { $("ledInfo").textContent = e.message || String(e); }
+}
+wireDrop($("drop"), $("fileIn"), loadCoverFile);
+wireDrop($("ledDrop"), $("ledIn"), loadLedFile);
+document.body.addEventListener("dragover", (e) => e.preventDefault());
+document.body.addEventListener("drop", (e) => { if (!e.target.closest(".drop")) { e.preventDefault(); const f = e.dataTransfer.files[0]; f && loadCoverFile(f); } });
+
+$("unit").onchange = async () => { if (S.sample) return; S.scale = parseFloat($("unit").value); rebuildCover(); await run(); };
+$("up").onchange = async () => { if (S.sample) return; S.up = $("up").value; rebuildCover(); await run(); };
+$("genBtn").onclick = run;
+
+// ---------- download ----------
+let downloads = null;
+$("dlBtn").onclick = async () => {
+  if (!S.result) return;
+  const standalone = !window.claude;
+  if (!downloads && !standalone) { $("dlHint").textContent = "Saving files isn't available in this view."; return; }
+  const P = readParams(), { D } = S.result;
+  const settings = [`Lamp Thread Maker settings for ${S.name}`, ``,
+    `LED puck Ø${P.ledD} × ${P.ledH} mm, cable Ø${P.cableD} at ${P.cableZ} mm`,
+    `Pocket Ø${fmt(2 * D.pocketR, 2)} (gap ${P.pocketClr}/side), floor ${P.floor}`,
+    `Thread Ø${fmt(2 * D.crestR, 2)} crest, Ø${fmt(2 * D.rootR, 2)} root, pitch ${P.pitch}, depth ${P.depth}, right-hand`,
+    `Thread gap ${P.thClr} (radial), length ${fmt(D.threadH, 2)}`,
+    `Ring outer Ø${fmt(2 * D.collarROut, 2)}, base Ø${fmt(2 * D.crestR, 2)} × ${fmt(D.wallTop, 2)}, visible band ${fmt(D.bandH, 2)}`,
+    `Cable slot at ${P.slotAngle}°, full height`, ``,
+    `Print both parts upright as exported (flat side on the plate).`].join("\n");
+  const blob = zip([
+    { name: `${S.name}_cover_threaded.stl`, data: toSTL(S.result.cover, "cover") },
+    { name: `${S.name}_base.stl`, data: toSTL(S.result.base, "base") },
+    { name: `settings.txt`, data: new TextEncoder().encode(settings) },
+  ]);
+  if (standalone) { // plain web page (e.g. GitHub Pages): normal browser download
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob); a.download = `${S.name}-lamp-set.zip`;
+    document.body.append(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+    $("dlHint").textContent = "Saved.";
+    return;
+  }
+  try {
+    await downloads.save({ filename: `${S.name}-lamp-set.zip`, data: blob });
+    $("dlHint").textContent = "Saved.";
+  } catch (e) {
+    $("dlHint").textContent = e?.code === "declined" ? "Download cancelled." : `Couldn't save the file (${e?.code || "error"}).`;
+  }
+};
+window.claude?.use?.("downloads").then((d) => { downloads = d; if (!d) $("dlHint").textContent = "Downloads aren't available in this view."; }).catch(() => {});
+
+// ---------- boot ----------
+(async () => {
+  try {
+    M = await loadEngine();
+  } catch (e) {
+    console.error(e);
+    busy(null);
+    showNotes([note("bad", "The geometry engine couldn't start in this browser (WebAssembly is blocked or unsupported). Try a recent Chrome, Edge, Safari or Firefox.")]);
+    return;
+  }
+  rebuildCover();
+  await run();
+})();
+</script>

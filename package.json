@@ -1,0 +1,9 @@
+{
+  "name": "lamp-thread-maker",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Drop a lampshade STL, get a screw-on threaded cover and a matching LED base.",
+  "scripts": { "build": "node build.mjs" },
+  "devDependencies": { "manifold-3d": "3.2.1" }
+}
