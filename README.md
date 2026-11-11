@@ -1,5 +1,7 @@
 # Lamp Thread Maker
 
+**Try it: [ttingchen.github.io/lamp-thread-maker](https://ttingchen.github.io/lamp-thread-maker/)**
+
 Drop a lampshade STL into the page. It finds the bottom opening, adds a screw-on threaded ring to the shade, and generates a matching base that holds an LED puck light with a cable slot. Everything runs in the browser; no files are uploaded anywhere.
 
 ![Preview](docs/screenshot.png)
