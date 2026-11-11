@@ -113,7 +113,10 @@ export function analyseBottom(man, h = 0.4) {
   if (!polys.length) return { open: false, rIn: 0, rOut: 0, polys };
   let rIn = Infinity, rOut = 0;
   for (const p of polys) for (const [x, y] of p) { const r = Math.hypot(x, y); rIn = Math.min(rIn, r); rOut = Math.max(rOut, r); }
-  const open = !inside([0, 0], polys);
+  // Open = the axis lies in a hole of the slice: some contour surrounds it, yet it isn't in material.
+  // (A sideways slice of a closed shell, e.g. a tail tip, doesn't surround the axis at all.)
+  const surrounded = polys.some((p) => inside([0, 0], [p]));
+  const open = surrounded && !inside([0, 0], polys);
   return { open, rIn: open ? rIn : 0, rOut, polys };
 }
 
@@ -182,9 +185,32 @@ export function derive(P) {
 }
 
 // Main entry: coverMan is the oriented cover (bottom at z=0, centred). Returns manifolds + report.
+// Centre of the bottom opening: the innermost slice contour that surrounds the axis.
+function polyCentroid(p) {
+  let a = 0, cx = 0, cy = 0;
+  for (let i = 0; i < p.length; i++) {
+    const [x1, y1] = p[i], [x2, y2] = p[(i + 1) % p.length], c = x1 * y2 - x2 * y1;
+    a += c; cx += (x1 + x2) * c; cy += (y1 + y2) * c;
+  }
+  return Math.abs(a) < 1e-9 ? null : [cx / (3 * a), cy / (3 * a)];
+}
+export function openingCentre(man, h = 0.4) {
+  const polys = man.slice(h).toPolygons();
+  if (inside([0, 0], polys)) return null;
+  const around = polys.filter((p) => inside([0, 0], [p]));
+  if (!around.length) return null;
+  around.sort((a, b) => Math.abs(polyArea(a)) - Math.abs(polyArea(b)));
+  return polyCentroid(around[0]);
+}
+
 export function generate(M, coverMan, P) {
   const D = derive(P);
   const notes = [];
+  const oc = openingCentre(coverMan);
+  if (oc && Math.hypot(oc[0], oc[1]) > 0.05) {
+    coverMan = coverMan.translate([-oc[0], -oc[1], 0]);
+    if (Math.hypot(oc[0], oc[1]) > 1) notes.push(`Centred the thread on the opening, ${Math.hypot(oc[0], oc[1]).toFixed(1)} mm from the model's bounding-box centre.`);
+  }
   const bottom = analyseBottom(coverMan);
 
   // ----- base -----

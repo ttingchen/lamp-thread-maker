@@ -376,7 +376,7 @@ function renderSpecs(r, P) {
   const { D, bottom } = r;
   const bb = r.cover.boundingBox();
   const items = [
-    ["Cover", `Ø${fmt(2 * Math.max(bb.max[0], bb.max[1]))} × ${fmt(bb.max[2])}`],
+    ["Cover", `${fmt(bb.max[0] - bb.min[0])} × ${fmt(bb.max[1] - bb.min[1])} × ${fmt(bb.max[2])}`],
     ["Opening found", bottom.open ? `Ø${fmt(2 * bottom.rIn)}` : "closed"],
     ["Thread", `Ø${fmt(2 * D.crestR)} × ${fmt(P.pitch)} RH`],
     ["Ring outer", `Ø${fmt(2 * D.collarROut)}`],
